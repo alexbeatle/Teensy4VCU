@@ -2,6 +2,7 @@
 #include <Bounce.h> //innput debouce library
 #include <FlexCAN_T4.h>
 #include <Servo.h>
+#include <InternalTemperature.h>
 FlexCAN_T4<CAN1, RX_SIZE_256, TX_SIZE_16> Can1; // Using CAN1 on pins 22/rx & 23/tx
 FlexCAN_T4<CAN2, RX_SIZE_256, TX_SIZE_16> Can2; // Using CAN2 on pins 0/rx & 1/tx
 FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> Can3; // Using CAN3 on pins 30/rx & 31/tx
@@ -13,8 +14,8 @@ FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> Can3; // Using CAN3 on pins 30/rx & 31
 #define CPU_REBOOT WRITE_RESTART(0x5FA0004)
 
 //PWM cooling
-#define CoolingSerial false //battery and main loop together
-#define CoolingParallel true //battery and main loop independent
+// #define CoolingSerial false //battery and main loop together
+// #define CoolingParallel true //battery and main loop independent
 #define CoolingRadiatorBypass true
 #define CoolingRadiatorIncl false
 
@@ -125,9 +126,10 @@ FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> Can3; // Using CAN3 on pins 30/rx & 31
 #define pwmOutPumpMain 2
 #define pwmOutPumpBat 3
 #define pwmOutFan 4
-#define outValveBypass 5
-#define outValveMain 6
-#define outValveBattery 7
+#define outValveBypass 6
+// #define outValveBypass 5
+// #define outValveMain 6
+// #define outValveBattery 7
 #define outBMSChargeReq 8
 #define outDCDCenable 9
 #define outOBCenable 10
@@ -140,6 +142,9 @@ FlexCAN_T4<CAN3, RX_SIZE_256, TX_SIZE_16> Can3; // Using CAN3 on pins 30/rx & 31
 #define din19Spare 19
 #define din20Spare 20
 #define din21Spare 21
+
+//CPU
+float VCUtempC=0;
 
 //watchdog
 uint32_t Debug_Stamp = millis();
@@ -274,7 +279,7 @@ uint16_t BMS_CapacityAh=0;
 uint32_t BMS_CapacityWhCharge=0;
 uint16_t BMS_PackVolt=0;
 int16_t BMS_AvgTemp=0;
-uint16_t BMS_BatAmp=0;
+long BMS_BatAmp=0;
 int BMS_CellsBal=0xff;
 uint8_t BMS_Error_CellOverVLimit = 0xff; //alarm: cell over high Voltage setpoint
 uint8_t BMS_Error_CellUnderVLimit = 0xff; //alarm: cell under low Voltage setpoint
@@ -402,7 +407,7 @@ int pwmFanCurVal=pwmFanTempVal;
 Servo FanESC;
 
 //vars
-bool coolingMode = CoolingSerial;
+// bool coolingMode = CoolingSerial;
 bool radiatorMode = CoolingRadiatorIncl;
 
 //debug menu
@@ -471,9 +476,9 @@ void setup()
   // radiator bypass valve
   pinMode(outValveBypass,OUTPUT);
   // main valve
-  pinMode(outValveMain,OUTPUT);
-  // battery valve
-  pinMode(outValveBattery,OUTPUT);
+  // pinMode(outValveMain,OUTPUT);
+  // // battery valve
+  // pinMode(outValveBattery,OUTPUT);
   valveCtrl();
 
   // stop charging hardware button
@@ -528,16 +533,16 @@ void setup()
 
 void valveCtrl(void)
   {
-    if (coolingMode==CoolingParallel)
-      {
-        if (digitalRead(outValveMain)!=LOW) {digitalWrite(outValveMain,LOW);}
-        if (digitalRead(outValveBattery)!=LOW) {digitalWrite(outValveBattery,LOW);}
-      }
-    else // CoolingSerial
-      {
-        if (digitalRead(outValveMain)!=HIGH) {digitalWrite(outValveMain,HIGH);}
-        if (digitalRead(outValveBattery)!=HIGH) {digitalWrite(outValveBattery,HIGH);}
-      }
+    // if (coolingMode==CoolingParallel)
+    //   {
+    //     if (digitalRead(outValveMain)!=LOW) {digitalWrite(outValveMain,LOW);}
+    //     if (digitalRead(outValveBattery)!=LOW) {digitalWrite(outValveBattery,LOW);}
+    //   }
+    // else // CoolingSerial
+    //   {
+    //     if (digitalRead(outValveMain)!=HIGH) {digitalWrite(outValveMain,HIGH);}
+    //     if (digitalRead(outValveBattery)!=HIGH) {digitalWrite(outValveBattery,HIGH);}
+    //   }
     if (radiatorMode==CoolingRadiatorBypass)
       {
         if (digitalRead(outValveBypass)!=LOW) {digitalWrite(outValveBypass,LOW);}
@@ -601,16 +606,16 @@ void menu(void)
             Serial.println();
             Serial.print("r - radiator valve toggle: ");
             Serial.print(digitalRead(outValveBypass));
-            Serial.println();
-            Serial.print("b - battery valve toggle: ");
-            Serial.print(digitalRead(outValveBattery));
-            Serial.println();
-            Serial.print("m - motor valve toggle: "); 
-            Serial.print(digitalRead(outValveMain));
-            Serial.println();
-            Serial.print("+ - serial/parallel cooling mode: ");
-            if (coolingMode){Serial.print("CoolingParallel");}
-            else {Serial.print("CoolingSerial");}
+            // Serial.println();
+            // Serial.print("b - battery valve toggle: ");
+            // Serial.print(digitalRead(outValveBattery));
+            // Serial.println();
+            // Serial.print("m - motor valve toggle: "); 
+            // Serial.print(digitalRead(outValveMain));
+            // Serial.println();
+            // Serial.print("+ - serial/parallel cooling mode: ");
+            // if (coolingMode){Serial.print("CoolingParallel");}
+            // else {Serial.print("CoolingSerial");}
             Serial.println();
             Serial.print("- - radiator bypass cooling mode: ");
             if (radiatorMode){Serial.print("CoolingRadiatorBypass");}
@@ -684,30 +689,30 @@ void menu(void)
             break;
           }
 				
-			  case 'b'://battery valve toggle 
-          {
-            digitalWrite(outValveBattery,!digitalRead(outValveBattery));
-            menuload = 1;
-            incomingByte = 'c';
-            break;
-          }
+			  // case 'b'://battery valve toggle 
+        //   {
+        //     digitalWrite(outValveBattery,!digitalRead(outValveBattery));
+        //     menuload = 1;
+        //     incomingByte = 'c';
+        //     break;
+        //   }
 				
-			  case 'm'://motor valve toggle 
-          {
-            digitalWrite(outValveMain,!digitalRead(outValveMain));
-            menuload = 1;
-            incomingByte = 'c';
-            break;
-          }
+			  // case 'm'://motor valve toggle 
+        //   {
+        //     digitalWrite(outValveMain,!digitalRead(outValveMain));
+        //     menuload = 1;
+        //     incomingByte = 'c';
+        //     break;
+        //   }
 
-        case 43:// + serial/parallel mode 
-          {
-            coolingMode=!coolingMode;
-            valveCtrl();
-            menuload = 1;
-            incomingByte = 'c';
-            break;
-          }
+        // case 43:// + serial/parallel mode 
+        //   {
+        //     coolingMode=!coolingMode;
+        //     valveCtrl();
+        //     menuload = 1;
+        //     incomingByte = 'c';
+        //     break;
+        //   }
 				
         case 45:// - radiator bypass mode 
           {
@@ -723,7 +728,7 @@ void menu(void)
             if (Serial.available() > 0)
             {
               pwmBPumpVarTemp = (uint16_t) (Serial.parseInt());
-              // pwmPumpVar=pwmPumpVarTemp;
+              pwmBPumpVar=pwmBPumpVarTemp;
               menuload = 1;
               incomingByte = 'c';
             }
@@ -735,7 +740,7 @@ void menu(void)
             if (Serial.available() > 0)
             {
               pwmMPumpVarTemp = (uint16_t) (Serial.parseInt());
-              // pwmPumpVar=pwmPumpVarTemp;
+              pwmMPumpVar=pwmMPumpVarTemp;
               menuload = 1;
               incomingByte = 'c';
             }
@@ -780,7 +785,12 @@ void Debug(void)
       Serial.println();
       Serial.println();
       Serial.println();
-
+      Serial.print      (" -----------------------------------------------------------VCU -----------------------------------------------------");
+      Serial.println(); // Line 0  
+      Serial.print("VCU Temperature: ");
+      printFormat(VCUtempC,1.0f,2);
+      Serial.print("C");
+      Serial.println();      
       Serial.print      (" -----------------------------------------------------------Values from BMS, Drive, Ibooster, etc. -----------------------------------------------------");
       Serial.print      (" -----------------------------------------------------------BMS -----------------------------------------------------");
       Serial.println(); // Line 0  
@@ -792,7 +802,7 @@ void Debug(void)
       if (BMS_State == BMS_Error)         Serial.print ("BMS_Error| "); 
       Serial.println();
       Serial.print("Amps seen by BMS: ");
-      printFormat(8192-BMS_BatAmp,10.0f,2);
+      printFormat(BMS_BatAmp,10.0f,1);
       Serial.println();
       Serial.print      ("BMS_CellsBal #");
       Serial.print(BMS_CellsBal);
@@ -971,6 +981,7 @@ void Debug(void)
       printFormat(LIM_SM,1.0f,0);
       Serial.print      ("     ->Charge SM Step         | ");
       Serial.println();
+      Serial.print      (" | ");
       printFormat(BMS_SOC,10.0f,2);
       Serial.print      ("% ->SOC from BMS           | "); 
 
@@ -1876,18 +1887,18 @@ void Check_BMS(CAN_message_t incoming)
         case canID_BMSStatus:
           {    
             uint16_t readingBMS_PackVoltage = 0; 
-            long readingBMS_Current = 0; 
+            uint16_t readingBMS_Current = 0; 
             int16_t readingBMS_AvgTemp = 0; 
 
             readingBMS_PackVoltage = (uint16_t)((incoming.buf[1] << 8) | (incoming.buf[0]));
             if (readingBMS_PackVoltage > 0) BMS_PackVolt=readingBMS_PackVoltage;
             else BMS_PackVolt = 0;
 
-            readingBMS_Current = (long)((incoming.buf[3] << 8) | (incoming.buf[2]));
+            readingBMS_Current = (uint16_t)((incoming.buf[3] << 8) | (incoming.buf[2]));
             // readingBMS_Current=readingBMS_Current/100; //miliamps to amps in 0.1A steps
             // readingBMS_Current=8192-readingBMS_Current;
-            if (readingBMS_Current > 0) BMS_BatAmp=(uint16_t)readingBMS_Current;
-            else BMS_BatAmp = 0;
+            BMS_BatAmp=(long)readingBMS_Current;
+            if (readingBMS_Current > 0x7ffffff) BMS_BatAmp=-BMS_BatAmp;
 
             readingBMS_AvgTemp = (int16_t)((incoming.buf[5] << 8) | (incoming.buf[4]));
             BMS_AvgTemp=readingBMS_AvgTemp;
@@ -2943,6 +2954,8 @@ void loop()
     incomingByte = Serial.read(); // read the incoming byte:
     menu();
   }
+  //CPU------------------------------------------------------------------------------------------------------
+  VCUtempC = InternalTemperature.readTemperatureC();
   // WATCHDOG-------------------------------------------------------------------------------------------------
   if ((millis() > (Debug_Stamp + 1000))) 
     {
@@ -3007,7 +3020,7 @@ void loop()
         }
     }
   
-  if (Drive_Cmd_Start==true)
+  if (Drive_Cmd_Start)
     {
       if ((millis() > (Drive_Cmd_Start_Watchdog + 5000)) || (Drive_Status != Drive_Stat_Invalid && Drive_OpMode != Drive_OPMODE_Invalid && Drive_OpMode == Drive_OPMODE_Run))
         {
@@ -3039,47 +3052,47 @@ void loop()
       if(!coolantOverride) //auto coolant control if simulation isn't enabled
         {
           valveCtrl(); //update valve positions
-          if(coolingMode == CoolingSerial) 
-            {
+          // if(coolingMode == CoolingSerial) 
+          //   {
               //if in temp threshold put updated frequency into temp variable to allow for delayed changes
-              if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000 || (BMS_CellsTempMax-273)>=36) 
-                {
-                  pwmFanTempVal=100;
-                  pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
-                  pwmBPumpVarTemp=pwmPumpHigh_hiFlow;
-                }
-              else
-                {
-                  if (Drive_MotorTemp>4000 || Drive_HtSnkTemp>10000 || (BMS_CellsTempMax-273)>33) 
-                    {
-                      pwmFanTempVal=30;
-                      pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
-                      pwmBPumpVarTemp=pwmPumpHigh_hiFlow;
-                    }
-                  if (Drive_MotorTemp<=3700 && Drive_HtSnkTemp<=9000 && (BMS_CellsTempMax-273)<=30) 
-                    {
-                      pwmFanTempVal=0;
-                      pwmMPumpVarTemp=pwmPumpHigh_lowFlow;
-                      pwmBPumpVarTemp=pwmPumpHigh_lowFlow;
-                    }
-                }
-              if (BMS_State==BMS_Charge) 
-                {
-                  if (pwmFanReqVal<30 || pwmFanTempVal<30) {pwmFanTempVal=30;}
-                  if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
-                  if (pwmBPumpVar>pwmPumpHigh_midFlow || pwmBPumpVarTemp>pwmPumpHigh_midFlow) {pwmBPumpVarTemp=pwmPumpHigh_midFlow;}
+              // if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000 || (BMS_CellsTempMax-273)>=36) 
+              //   {
+              //     pwmFanTempVal=100;
+              //     pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
+              //     pwmBPumpVarTemp=pwmPumpHigh_hiFlow;
+              //   }
+              // else
+              //   {
+              //     if (Drive_MotorTemp>4000 || Drive_HtSnkTemp>10000 || (BMS_CellsTempMax-273)>33) 
+              //       {
+              //         pwmFanTempVal=30;
+              //         pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
+              //         pwmBPumpVarTemp=pwmPumpHigh_hiFlow;
+              //       }
+              //     if (Drive_MotorTemp<=3700 && Drive_HtSnkTemp<=9000 && (BMS_CellsTempMax-273)<=30) 
+              //       {
+              //         pwmFanTempVal=0;
+              //         pwmMPumpVarTemp=pwmPumpHigh_lowFlow;
+              //         pwmBPumpVarTemp=pwmPumpHigh_lowFlow;
+              //       }
+              //   }
+              // if (BMS_State==BMS_Charge) 
+              //   {
+              //     if (pwmFanReqVal<30 || pwmFanTempVal<30) {pwmFanTempVal=30;}
+              //     if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
+              //     if (pwmBPumpVar>pwmPumpHigh_midFlow || pwmBPumpVarTemp>pwmPumpHigh_midFlow) {pwmBPumpVarTemp=pwmPumpHigh_midFlow;}
 
-                }
-              if (BMS_State==BMS_Drive) 
-                {
-                  if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
-                  if (pwmBPumpVar>pwmPumpHigh_midFlow || pwmBPumpVarTemp>pwmPumpHigh_midFlow) {pwmBPumpVarTemp=pwmPumpHigh_midFlow;}
-                }
-            }
-          else
-            {
-              pwmBPumpVarTemp=pwmPumpHigh_lowFlow;
-              //if in temp threshold put updated frequency into temp variable to allow for delayed changes
+              //   }
+              // if (BMS_State==BMS_Drive) 
+              //   {
+              //     if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
+              //     if (pwmBPumpVar>pwmPumpHigh_midFlow || pwmBPumpVarTemp>pwmPumpHigh_midFlow) {pwmBPumpVarTemp=pwmPumpHigh_midFlow;}
+              //   }
+          //   }
+          // else
+          //   {
+          //     pwmBPumpVarTemp=pwmPumpHigh_lowFlow;
+          //     //if in temp threshold put updated frequency into temp variable to allow for delayed changes
               if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000) 
                 {
                   pwmFanTempVal=100;
@@ -3102,7 +3115,7 @@ void loop()
                 {
                   if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
                 }
-            }
+            // }
         }
     }
   else  //ignition off?
