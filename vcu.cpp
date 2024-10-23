@@ -229,7 +229,7 @@ uint8_t ElconCharger_BatVoltError=0xff;
 uint8_t ElconCharger_CommTimeout=0xff;
 bool ElconCharger_msgInvalid=false;
 bool ElconCharger_CtrlReq=false;
-uint16_t ElconCharger_CurrentReq=0x00;
+uint16_t ElconCharger_AmpReq=0x00;
 const uint16_t ElconCharger_CurrentReqMax=200; //20A DC; 0.1A scale
 const uint16_t ElconCharger_CurrentReqMin=50; //5A DC; 0.1A scale
 // const uint16_t ElconCharger_CurrentConsumeMax=320; //32A AC;  0.1A scale
@@ -266,10 +266,10 @@ const uint16_t  canID_BMSAlarmsWarnings = 0x35A; //3-undervolt; 4-overvolt; 7-ov
 const uint16_t  canID_BMSLowHigh = 0x373; //LSB+MSB: 0,1 - Min Cell Volt, 1V; 2,3 - Max Cell Volt, 1V; 4,5 - Min Cell Temp, 1K; 6,7 - Max Cell Temp, 1K; 
 const uint16_t  canID_BMSInfo = 0x379; //4 - BMS Status: .0:Boot, .1:Ready, .2:Drive, .3:Charge, .4:Precharge, .5:Error
 int BMS_State = 0; //
-long BMS_ChargeVoltLim=0; //scale 0.1
-long BMS_ChargeAmpLim=0; //scale 0.1
-long BMS_disChargeVoltLim=0; //scale 0.1
-long BMS_disChargeAmpLim=0; //scale 0.1
+uint16_t BMS_ChargeVoltLim=0; //scale 0.1
+uint16_t BMS_ChargeAmpLim=0; //scale 0.1
+uint16_t BMS_disChargeVoltLim=0; //scale 0.1
+uint16_t BMS_disChargeAmpLim=0; //scale 0.1
 uint16_t BMS_SOC=0;
 float BMS_CellsVoltMin=0;
 float BMS_CellsVoltMax=0;
@@ -300,11 +300,11 @@ uint16_t LIM_DCSE_V_Trhd=0;                    // E 29Eh Threshold voltage up to
 uint16_t LIM_DCSE_I_Avbl=0;                    // E 29Eh Available current up to 255A in 0.1A steps
 uint16_t LIM_DCSE_V_Avbl=0;                    // E 29Eh Available voltage up to 600V in 0.1A steps
 uint8_t LIM_DCSE_Stat_Iso=0b11;                // E 29Eh Isolation 0=invalid, 1=valid, 2=feler, 3=signal-invalid
-uint8_t LIM_DCSE_Stat_Chg=0xF;                 // E 29Eh Charging status from EVSE 0=not ready, 1=ready, 2=switch off, 3=interrupt, 4=precharge, 5=iso-monitoring, 6=emergency stop, 7=error, F=signal-invalid
+uint8_t LIM_DCSE_Stat_Chg=0xF;                 // E 29Eh Internal EVSE status 0=not ready, 1=ready, 2=switch off, 3=interrupt, 4=precharge, 5=iso-monitoring, 6=emergency stop, 7=error, F=signal-invalid
 uint8_t LIM_DCSE_Weld_Det=0b11;                // E 29Eh Weld detection available? 0=no, 1=yes, 3= signal invalid
 uint16_t LIM_DCSE_Rst_Tme_Chg;                 // E 2B2h Remaining charging time of DC EVSE in seconds
-uint8_t LIM_DCSE_V_Lim_exce;                   // E 2B2h Voltage limit reached? 0=no 1=yes 3=invalid
-uint8_t LIM_DCSE_I_Lim_exce;                   // E 2B2h Current limit reached? 0=no 1=yes 3=invalid
+uint8_t LIM_DCSE_V_LIM_Reached;                   // E 2B2h Voltage limit reached? 0=no 1=yes 3=invalid
+uint8_t LIM_DCSE_I_LIM_Reached;                   // E 2B2h Current limit reached? 0=no 1=yes 3=invalid
 uint8_t LIM_DCSE_DC_Stp_Crt;                   // E 2B2h DC charging stop 0=tracking mode, 1=suppression mode, 3=invalid
 uint8_t LIM_DCSE_Bat_Prob;                     // E 2B2h Battery failure 0=normal, 1=fail. 3=invalid
 uint8_t LIM_DCSE_Bat_Comp;                     // E 2B2h Battery compatible? 0=compatible, 1=incompatible
@@ -315,7 +315,7 @@ uint16_t LIM_DCSE_I_Current;                       // E 2B2h Current current fro
 uint16_t LIM_DCSE_V_Current;                       // E 2B2h Current voltage from DC EVSE to 600V in 0.1V steps
 uint8_t LIM_DCSE_Eng_Trsm;                     // E 2EFh Transferred kWh from the DC EVSE in 0.25kWh steps
 uint8_t LIM_DCSE_Lacation;                     // E 2EFh 0=private, 1=office, 2=public, 3=invalid
-uint8_t LIM_DCSE_P_Lim_exce;                   // E 2EFh Performance limit reached? 0=no 1=yes 3=invalid
+uint8_t LIM_DCSE_P_LIM_Reached;                   // E 2EFh Power limit reached? 0=no 1=yes 3=invalid
 uint16_t LIM_DCSE_I_Tol;                       // E 2EFh Current tolerance up to 20A in 0.01A steps
 uint16_t LIM_DCSE_I_Riple;                     // E 2EFh Current ripple up to 20A in 0.01A steps
 uint16_t LIM_DCSE_I_Min_Avbl;                  // E 2EFh Minimum available current up to 409.3A in 0.1A steps
@@ -352,11 +352,12 @@ uint8_t CCS_Contactor_Ctrl=0;                            //4 bits with DC ccs co
 uint8_t  ctr_mins_LIMsend_EOC=0;                           // End of Charge timer: Remaining charging time for the display in minutes
 uint16_t ctr_secs_LIMsend_BulkSOC=0;                           //Time to bulk soc target. Remaining charging time up to e.g. 80%
 uint16_t ctr_secs_LIMsend_FullSOC=0;                           //Time to full SOC target. Remaining charging time up to 100%
-uint8_t CCSI_Spnt=0;
-IntervalTimer timer_10ms_LIMsend;                    //interrupt used to send periodic messages to LIM
+uint8_t CCS_ChargeAmpReq=0;
+IntervalTimer timer_10ms_send;                    //interrupt used to send periodic messages
 uint8_t ctr_20ms_LIMsend=0;
 uint8_t ctr_200ms_LIMsend=0;
 uint8_t ctr_100ms_LIMsend=0;
+uint8_t ctr_100ms_DRIVEsend=0;
 uint8_t ctr_1s_LIMsend=0;
 uint8_t ctr_4s_LIMsend=0;
 // uint8_t Timer_1Sec=0;
@@ -511,8 +512,8 @@ void setup()
   Set_ZeroIBooster();
 
   // LIM
-  timer_10ms_LIMsend.begin(periodicLIMmsg, 10000);
-  timer_10ms_LIMsend.priority(0);
+  timer_10ms_send.begin(periodicMSG, 10000);
+  timer_10ms_send.priority(0);
 }
 
   void fanCtrl(void)
@@ -806,6 +807,18 @@ void Debug(void)
       Serial.println();
       Serial.print      ("BMS_CellsBal #");
       Serial.print(BMS_CellsBal);
+      Serial.println();
+      Serial.print      ("BMS Charge Limits: ");
+      printFormat(BMS_ChargeVoltLim,10.0f,1);
+      Serial.print      ("V ");
+      printFormat(BMS_ChargeAmpLim,10.0f,1);
+      Serial.print      ("A");
+      Serial.println();
+      Serial.print      ("BMS disCharge Limits: ");
+      printFormat(BMS_disChargeVoltLim,10.0f,1);
+      Serial.print      ("V ");
+      printFormat(BMS_disChargeAmpLim,10.0f,1);
+      Serial.print      ("A");
       Serial.println();
       if (BMS_Error_CellOverVLimit == 0x1) Serial.print ("Error_CellOverVLimit| "); 
       if (BMS_Error_CellUnderVLimit == 0x1) Serial.print ("Error_CellUnderVLimit| "); 
@@ -1191,7 +1204,7 @@ void Debug_AC(void)
       else Serial.print ("   -.--");
       Serial.print      ("VDC ->AC Charger Limit Volts        | ");
       // Serial.println();   
-      if (BMS_ChargeAmpLim < 0xFFFF) printFormat(ElconCharger_CurrentReq,10.0f,2);
+      if (BMS_ChargeAmpLim < 0xFFFF) printFormat(ElconCharger_AmpReq,10.0f,2);
       else Serial.print ("   -.--");
       Serial.print      ("ADC ->AC Charger Limit Amps        | ");
       // // Serial.println();   
@@ -1370,9 +1383,9 @@ void Debug_DC(void)
   if (LIM_DCSE_Lacation==2)  Serial.print ("Location public              | ");
   if (LIM_DCSE_Lacation==3)  Serial.print ("Location invalid                | ");
 
-  if (LIM_DCSE_P_Lim_exce==0)  Serial.print ("Performance limit reached? no   | ");
-  if (LIM_DCSE_P_Lim_exce==1)  Serial.print ("Performance limit reached? yes     | ");
-  if (LIM_DCSE_P_Lim_exce==3)  Serial.print ("Performance limit reached? invalid   | ");
+  if (LIM_DCSE_P_LIM_Reached==0)  Serial.print ("Power limit reached? no   | ");
+  if (LIM_DCSE_P_LIM_Reached==1)  Serial.print ("Power limit reached? yes     | ");
+  if (LIM_DCSE_P_LIM_Reached==3)  Serial.print ("Power limit reached? invalid   | ");
 
   Serial.println(); // Line 5
   Serial.print      (" | ");
@@ -1388,13 +1401,13 @@ void Debug_DC(void)
 
   Serial.println(); // Line 6
   Serial.print      (" | ");
-  if (LIM_DCSE_V_Lim_exce==0)  Serial.print ("Voltage limit reached? no   | ");
-  if (LIM_DCSE_V_Lim_exce==1)  Serial.print ("Voltage limit reached? yes     | ");
-  if (LIM_DCSE_V_Lim_exce==3)  Serial.print ("Voltage limit reached? invalid   | ");
+  if (LIM_DCSE_V_LIM_Reached==0)  Serial.print ("Voltage limit reached? no   | ");
+  if (LIM_DCSE_V_LIM_Reached==1)  Serial.print ("Voltage limit reached? yes     | ");
+  if (LIM_DCSE_V_LIM_Reached==3)  Serial.print ("Voltage limit reached? invalid   | ");
 
-  if (LIM_DCSE_I_Lim_exce==0)  Serial.print ("Current limit reached? no       | ");
-  if (LIM_DCSE_I_Lim_exce==1)  Serial.print ("Current limit reached? yes         | ");
-  if (LIM_DCSE_I_Lim_exce==3)  Serial.print ("Current limit reached? invalid   | ");
+  if (LIM_DCSE_I_LIM_Reached==0)  Serial.print ("Current limit reached? no       | ");
+  if (LIM_DCSE_I_LIM_Reached==1)  Serial.print ("Current limit reached? yes         | ");
+  if (LIM_DCSE_I_LIM_Reached==3)  Serial.print ("Current limit reached? invalid   | ");
 
   if (LIM_DCSE_DC_Stp_Crt==0)  Serial.print ("DC charging stop tracking mode       | ");
   if (LIM_DCSE_DC_Stp_Crt==1)  Serial.print ("DC charging stop suppression mode | ");
@@ -1503,8 +1516,8 @@ void Set_ZeroDC(void)
   LIM_DCSE_Weld_Det=3;
 
   LIM_DCSE_Rst_Tme_Chg=0xFFFF;
-  LIM_DCSE_V_Lim_exce=3;
-  LIM_DCSE_I_Lim_exce=3;
+  LIM_DCSE_V_LIM_Reached=3;
+  LIM_DCSE_I_LIM_Reached=3;
   LIM_DCSE_DC_Stp_Crt=3;
   LIM_DCSE_Bat_Prob=3;
   LIM_DCSE_Bat_Comp=3;
@@ -1516,7 +1529,7 @@ void Set_ZeroDC(void)
 
   LIM_DCSE_Eng_Trsm=0xFF;
   LIM_DCSE_Lacation=3;
-  LIM_DCSE_P_Lim_exce=3;
+  LIM_DCSE_P_LIM_Reached=3;
   LIM_DCSE_I_Tol=0XFFF;
   LIM_DCSE_I_Riple=0XFFF;
   LIM_DCSE_I_Min_Avbl=0xFFF;
@@ -1745,8 +1758,8 @@ void Check_LIM(CAN_message_t incoming)
         break;
         case 0x2B2:    
           LIM_DCSE_Rst_Tme_Chg = (uint16_t)((incoming.buf[7] << 8) | (incoming.buf[6]));
-          LIM_DCSE_V_Lim_exce = ((incoming.buf[5] >> 6) & 3);
-          LIM_DCSE_I_Lim_exce = ((incoming.buf[5] >> 4) & 3);
+          LIM_DCSE_V_LIM_Reached = ((incoming.buf[5] >> 6) & 3);
+          LIM_DCSE_I_LIM_Reached = ((incoming.buf[5] >> 4) & 3);
           LIM_DCSE_DC_Stp_Crt= ((incoming.buf[5] >> 2) & 3);
           LIM_DCSE_Bat_Prob= ((incoming.buf[5] >> 0) & 3);
           LIM_DCSE_Bat_Comp= ((incoming.buf[4] >> 6) & 3);
@@ -1759,7 +1772,7 @@ void Check_LIM(CAN_message_t incoming)
         case 0x2EF:    
           LIM_DCSE_Eng_Trsm = incoming.buf[7];
           LIM_DCSE_Lacation = ((incoming.buf[6] >> 6) & 3);
-          LIM_DCSE_P_Lim_exce = ((incoming.buf[6] >> 4) & 3);
+          LIM_DCSE_P_LIM_Reached = ((incoming.buf[6] >> 4) & 3);
           LIM_DCSE_I_Tol = (uint16_t)((((incoming.buf[6] >> 0) & 15) << 8) | (incoming.buf[5]));
           LIM_DCSE_I_Riple =    (uint16_t)((incoming.buf[4] << 4) | ((incoming.buf[3] >> 4) & 4));
           LIM_DCSE_I_Min_Avbl = (uint16_t)((((incoming.buf[3] >> 0) & 15) << 8) | (incoming.buf[2]));
@@ -1801,7 +1814,7 @@ void Check_BMS(CAN_message_t incoming)
           uint16_t readingBMSCap=0;
           int readingBMSCellsBal=0xFF;
 
-          readingBMSCap=(long)((incoming.buf[1] << 8) | (incoming.buf[0]));
+          readingBMSCap=(uint16_t)((incoming.buf[1] << 8) | (incoming.buf[0]));
           if (readingBMSCap > 0) BMS_CapacityAh=readingBMSCap;
           else BMS_CapacityAh = 0;
 
@@ -1816,28 +1829,28 @@ void Check_BMS(CAN_message_t incoming)
           }
         case canID_BMSLimits:
           {    
-          long readingBMS_ChargeVoltLim = 0; 
-          long readingBMS_ChargeAmpLim = 0; 
-          long readingBMS_disChargeVoltLim = 0; 
-          long readingBMS_disChargeAmpLim = 0; 
+          uint16_t readingBMS_ChargeVoltLim = 0; 
+          uint16_t readingBMS_ChargeAmpLim = 0; 
+          uint16_t readingBMS_disChargeVoltLim = 0; 
+          uint16_t readingBMS_disChargeAmpLim = 0; 
 
-          readingBMS_ChargeVoltLim = (long)((incoming.buf[1] << 8) | (incoming.buf[0]));
+          readingBMS_ChargeVoltLim = (uint16_t)((incoming.buf[1] << 8) | (incoming.buf[0]));
           // readingBMS_ChargeVoltLim = readingBMS_ChargeVoltLim/10; 
           if (readingBMS_ChargeVoltLim > 0) BMS_ChargeVoltLim=readingBMS_ChargeVoltLim;
           else BMS_ChargeVoltLim = 0;
           BMS_CapacityWhCharge=(uint32_t) (BMS_CapacityAh*BMS_ChargeVoltLim);
 
-          readingBMS_ChargeAmpLim = (long)((incoming.buf[3] << 8) | (incoming.buf[2]));
+          readingBMS_ChargeAmpLim = (uint16_t)((incoming.buf[3] << 8) | (incoming.buf[2]));
           // readingBMS_ChargeAmpLim = readingBMS_ChargeAmpLim/10; 
           if (readingBMS_ChargeAmpLim > 0) BMS_ChargeAmpLim=readingBMS_ChargeAmpLim;
           else BMS_ChargeAmpLim = 0;
 
-          readingBMS_disChargeVoltLim = (long)((incoming.buf[7] << 8) | (incoming.buf[6]));
+          readingBMS_disChargeVoltLim = (uint16_t)((incoming.buf[7] << 8) | (incoming.buf[6]));
           // readingBMS_disChargeVoltLim = readingBMS_disChargeVoltLim/10; 
           if (readingBMS_disChargeVoltLim > 0) BMS_disChargeVoltLim=readingBMS_disChargeVoltLim;
           else BMS_disChargeVoltLim = 0;
 
-          readingBMS_disChargeAmpLim = (long)((incoming.buf[5] << 8) | (incoming.buf[4]));
+          readingBMS_disChargeAmpLim = (uint16_t)((incoming.buf[5] << 8) | (incoming.buf[4]));
           // readingBMS_disChargeAmpLim = readingBMS_disChargeAmpLim/10; 
           if (readingBMS_disChargeAmpLim > 0) BMS_disChargeAmpLim=readingBMS_disChargeAmpLim;
           else BMS_disChargeAmpLim = 0;
@@ -1857,19 +1870,19 @@ void Check_BMS(CAN_message_t incoming)
           }
         case canID_BMSLowHigh:
           {    
-          float readingBMS_MaxCellsVolt = 0; 
-          float readingBMS_MinCellsVolt = 0; 
+          uint16_t readingBMS_MaxCellsVolt = 0; 
+          uint16_t readingBMS_MinCellsVolt = 0; 
           uint16_t readingBMS_MaxCellsTemp = 0; 
           uint16_t readingBMS_MinCellsTemp = 0; 
 
-          readingBMS_MinCellsVolt = (float)((incoming.buf[1] << 8) | (incoming.buf[0]));
+          readingBMS_MinCellsVolt = (uint16_t)((incoming.buf[1] << 8) | (incoming.buf[0]));
           // readingBMS_MinCellsVolt = readingBMS_MinCellsVolt/1000;
-          if (readingBMS_MinCellsVolt > 0) BMS_CellsVoltMin=readingBMS_MinCellsVolt;
+          if (readingBMS_MinCellsVolt > 0) BMS_CellsVoltMin=readingBMS_MinCellsVolt*1.0f;
           else BMS_CellsVoltMin = 0;
 
-          readingBMS_MaxCellsVolt = (float)((incoming.buf[3] << 8) | (incoming.buf[2]));
+          readingBMS_MaxCellsVolt = (uint16_t)((incoming.buf[3] << 8) | (incoming.buf[2]));
           // readingBMS_MaxCellsVolt = readingBMS_MaxCellsVolt/1000;
-          if (readingBMS_MaxCellsVolt > 0) BMS_CellsVoltMax=readingBMS_MaxCellsVolt;
+          if (readingBMS_MaxCellsVolt > 0) BMS_CellsVoltMax=readingBMS_MaxCellsVolt*1.0f;
           else BMS_CellsVoltMax = 0;
 
           readingBMS_MinCellsTemp = (uint16_t) incoming.buf[5] << 8 | incoming.buf[4];
@@ -1957,7 +1970,8 @@ void Check_Drive(CAN_message_t incoming)
 void send_Drive_Cmd(void)   //send Drive Command
   {
     CAN_message_t outgoing;
-    long temp_data[2];
+    uint32_t Drive_Cmd_temp_data[2];
+    uint32_t Drive_Cmd_CRC = 0xffffffff;
 
     Drive_Cmd_Cruise=false;
     Drive_Cmd_Brake=false;
@@ -1967,33 +1981,52 @@ void send_Drive_Cmd(void)   //send Drive Command
     Drive_Cmd_Pot1=0;
     Drive_Cmd_Pot2=0;
     Drive_Cmd_CruiseSpeed=0;
-    Drive_Cmd_RegenPreset=100; //apply fully define regen
+    if (BMS_SOC>=900) {Drive_Cmd_RegenPreset=0;} //apply no regen
+    if (BMS_SOC<=850) {Drive_Cmd_RegenPreset=100;} //apply fully defined regen
     Drive_Cmd_Ctr1+=1;
     Drive_Cmd_Ctr2+=1;
 
-    long Pot = Drive_Cmd_Pot1 & 0xFFF;
-    long Pot2 = Drive_Cmd_Pot2 & 0xFFF;
-    long canio = ( Drive_Cmd_Cruise | Drive_Cmd_Start<<1|Drive_Cmd_Brake<<2|Drive_Cmd_Fwd<<3|Drive_Cmd_Rev<<4|Drive_Cmd_BMS<<5 ) & 0x3F;
-    long ctr1 = Drive_Cmd_Ctr1 & 0x3;
-    long ctr2 = Drive_Cmd_Ctr2 & 0x3;
-    long cruise_speed = Drive_Cmd_CruiseSpeed & 0x3FFF;
-    long regen_preset = Drive_Cmd_RegenPreset & 0x7F;
+    uint32_t Pot = Drive_Cmd_Pot1 & 0xFFF;
+    uint32_t Pot2 = Drive_Cmd_Pot2 & 0xFFF;
+    uint32_t canio = ( Drive_Cmd_Cruise | Drive_Cmd_Start<<1|Drive_Cmd_Brake<<2|Drive_Cmd_Fwd<<3|Drive_Cmd_Rev<<4|Drive_Cmd_BMS<<5 ) & 0x3F;
+    uint32_t ctr1 = Drive_Cmd_Ctr1 & 0x3;
+    uint32_t ctr2 = Drive_Cmd_Ctr2 & 0x3;
+    uint32_t cruise_speed = Drive_Cmd_CruiseSpeed & 0x3FFF;
+    uint32_t regen_preset = Drive_Cmd_RegenPreset & 0x7F;
 
-    temp_data[0] = Pot | (Pot2 << 12) | (canio << 24) | (ctr1 << 30);
-    temp_data[1] = cruise_speed | (ctr2 << 14) | (regen_preset << 16);
+    Drive_Cmd_temp_data[0] = Pot | (Pot2 << 12) | (canio << 24) | (ctr1 << 30);
+    Drive_Cmd_temp_data[1] = cruise_speed | (ctr2 << 14) | (regen_preset << 16);
+    Drive_Cmd_CRC = crc32_word(Drive_Cmd_CRC, Drive_Cmd_temp_data[0]);
+    Drive_Cmd_CRC = crc32_word(Drive_Cmd_CRC, Drive_Cmd_temp_data[1]);
 
     outgoing.id = canID_Drive_Cmd;
     outgoing.flags.extended = false;
     outgoing.len = 8;    
-    outgoing.buf[0]= (temp_data[0]) & 0xFF;
-    outgoing.buf[1]= (temp_data[0]>>8) & 0xFF;
-    outgoing.buf[2]= (temp_data[0]>>16) & 0xFF;
-    outgoing.buf[3]= (temp_data[0])>>24 & 0xFF;
-    outgoing.buf[4]= (temp_data[1]) & 0xFF;
-    outgoing.buf[5]= (temp_data[1]>>8) & 0xFF;
-    outgoing.buf[6]= (temp_data[1]>>16) & 0xFF;
-    outgoing.buf[7]= (temp_data[1])>>24 & 0xFF;
+    outgoing.buf[0]= (Drive_Cmd_temp_data[0]) & 0xFF;
+    outgoing.buf[1]= (Drive_Cmd_temp_data[0]>>8) & 0xFF;
+    outgoing.buf[2]= (Drive_Cmd_temp_data[0]>>16) & 0xFF;
+    outgoing.buf[3]= (Drive_Cmd_temp_data[0])>>24 & 0xFF;
+    outgoing.buf[4]= (Drive_Cmd_temp_data[1]) & 0xFF;
+    outgoing.buf[5]= (Drive_Cmd_temp_data[1]>>8) & 0xFF;
+    outgoing.buf[6]= (Drive_Cmd_temp_data[1]>>16) & 0xFF;
+    // outgoing.buf[7]= (Drive_Cmd_temp_data[1])>>24 & 0xFF;
+    outgoing.buf[7]=  Drive_Cmd_CRC & 0xFF;
     Can1.write(outgoing);
+  }
+
+static uint32_t crc32_word(uint32_t Crc, uint32_t Data)
+  {
+    uint8_t i;
+
+    Crc ^= Data;
+
+    for(i=0; i<32; i++)
+      if (Crc & 0x80000000)
+        Crc = (Crc << 1) ^ 0x04C11DB7; // Polynomial used in STM32
+      else
+        Crc = (Crc << 1);
+
+    return(Crc);
   }
 
 void Check_IBooster(CAN_message_t incoming)
@@ -2043,10 +2076,10 @@ void Check_IBooster(CAN_message_t incoming)
     IBooster_watchdog=millis();
   }
 
-// Messages needed to be sent to LIM
-void periodicLIMmsg(void)
+// Messages needed to be sent to periodically
+void periodicMSG(void)
   {
-    timer_10ms_LIMsend.end(); //pause interrupt feature
+    timer_10ms_send.end(); //pause interrupt feature
     // 10ms
     send_112h();
     //questionable messages. maybe needed!? tbd
@@ -2062,7 +2095,7 @@ void periodicLIMmsg(void)
         ctr_20ms_LIMsend=0; 
         send_1A1h();
       }
-
+        
     // 200ms
     ctr_200ms_LIMsend++;
     if(ctr_200ms_LIMsend>=20) 
@@ -2108,9 +2141,16 @@ void periodicLIMmsg(void)
         // send_ctrlDCDC(); //DCDC command
       }
 
+    //100ms
+    ctr_100ms_DRIVEsend++;
+    if(ctr_100ms_DRIVEsend>=10) 
+      {
+        ctr_100ms_DRIVEsend=0; 
+        send_Drive_Cmd();
+      }  
 
 
-    timer_10ms_LIMsend.begin(periodicLIMmsg, 10000); //restart interrupt feature
+    timer_10ms_send.begin(periodicMSG, 10000); //restart interrupt feature
   }
 
 // every 10ms
@@ -2512,19 +2552,18 @@ void send_3A0h(void)   //Energy status, error memory lock
 
 void send_ElconCharger_CtrlReq(void)
   {
-    // uint16_t EVSEChargeCurrent10=LIM_ACSE_I_Avbl_Grid*10; //charger capability AC charge current in 0.1A increments
-    ElconCharger_CurrentReq = (uint16_t) (LIM_ACSE_I_Avbl_Grid*10);
-    ElconCharger_CurrentReq = (uint16_t) (ElconCharger_CurrentReq/ElconCharger_CurrentConst);
+    ElconCharger_AmpReq = (uint16_t) (LIM_ACSE_I_Avbl_Grid*10); //Get AC current available at the EVSE in 0.1A increments
+    ElconCharger_AmpReq = (uint16_t) (ElconCharger_AmpReq/ElconCharger_CurrentConst); //convert AC current from EVSE to DC current
     //SOC>80%
-    if (BMS_SOC>800) {ElconCharger_CurrentReq=ElconCharger_CurrentReqMin;}
+    if (BMS_SOC>800) {ElconCharger_AmpReq=ElconCharger_CurrentReqMin;}
     //SOC>=100%
-    if (BMS_SOC>=1000){ElconCharger_CurrentReq=0x00;}
+    if (BMS_SOC>=1000){ElconCharger_AmpReq=0x00;}
     //BMS current limit should prevail
-    if (ElconCharger_CurrentReq>BMS_ChargeAmpLim){ElconCharger_CurrentReq=BMS_ChargeAmpLim;}
+    if (ElconCharger_AmpReq>BMS_ChargeAmpLim){ElconCharger_AmpReq=BMS_ChargeAmpLim;}
     //Do not exceet Elcon max charging current
-    if (ElconCharger_CurrentReq>ElconCharger_CurrentReqMax){ElconCharger_CurrentReq=ElconCharger_CurrentReqMax;}
+    if (ElconCharger_AmpReq>ElconCharger_CurrentReqMax){ElconCharger_AmpReq=ElconCharger_CurrentReqMax;}
     //Do not exceet Elcon min charging current -> quit charging
-    if (ElconCharger_CurrentReq<ElconCharger_CurrentReqMin){ElconCharger_CurrentReq=0;}
+    if (ElconCharger_AmpReq<ElconCharger_CurrentReqMin){ElconCharger_AmpReq=0;}
 
     CAN_message_t outgoing;
     outgoing.id = canID_ElconChargerCtrl;
@@ -2532,11 +2571,11 @@ void send_ElconCharger_CtrlReq(void)
     outgoing.len = 8;
     outgoing.buf[0] = (uint8_t) (BMS_ChargeVoltLim >> 8);
     outgoing.buf[1] = (uint8_t) (BMS_ChargeVoltLim & 0xff);
-    outgoing.buf[2] = (uint8_t) (ElconCharger_CurrentReq >> 8);
-    outgoing.buf[3] = (uint8_t) (ElconCharger_CurrentReq & 0xff);
+    outgoing.buf[2] = (uint8_t) (ElconCharger_AmpReq >> 8);
+    outgoing.buf[3] = (uint8_t) (ElconCharger_AmpReq & 0xff);
     if (LIM_SM==24 || LIM_SM==25)
       {
-        if (ElconCharger_CurrentReq>0){outgoing.buf[4] = ChargeEnd_No;} //start charger
+        if (ElconCharger_AmpReq>0){outgoing.buf[4] = ChargeEnd_No;} //start charger
         else {outgoing.buf[4] = ChargeEnd_Yes;} //stop charger
       }
     outgoing.buf[5] = 0x00;
@@ -2621,13 +2660,13 @@ void Everything_Off(void)
     ChargePower=0;
     ChargeEnd=ChargeEnd_Yes;
     DCChargeEnd=DCChargeEnd_Yes;
-    ElconCharger_CurrentReq=0;
+    ElconCharger_AmpReq=0;
   }
 
 // DC Charging
 void DC_Charge(void)
   {
-    if(LIM_SM>19)LIM_SM=0;//clear from  ac test mode
+    if(LIM_SM>19)LIM_SM=0;//clear from  ac charge mode
     /*
 
     0=no pilot
@@ -2650,13 +2689,13 @@ void DC_Charge(void)
               }
             DC_Charge_Phase=DCChargePhase_Standby;
             CCS_Contactor_Ctrl=0x0; //dc contactor mode control required in DC
-            I_Target_DCCharge=0;//ccs current request from web ui for now.
+            I_Target_DCCharge=0;
             ctr_mins_LIMsend_EOC=0x00;//end of charge timer
             ChargeStatus=Charge_Initialisation;
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_No;
             ChargePower=0;//0 power
-            CCSI_Spnt=0;//No current
+            CCS_ChargeAmpReq=0;//No current
             //if(CP_Mode==0x4 && opmode==MOD_CHARGE) LIM_SM++;
             if (millis() > millis_ctr_LIM_SM + 2000)
               {
@@ -2670,16 +2709,16 @@ void DC_Charge(void)
           {
             DC_Charge_Phase=DCChargePhase_Initialisation;
             CCS_Contactor_Ctrl=0x0; //dc contactor mode control required in DC
-            I_Target_DCCharge=0;//ccs current request from web ui for now.
+            I_Target_DCCharge=0;
             ctr_mins_LIMsend_EOC=0x00;//end of charge timer
             ChargeStatus=Charge_Initialisation;
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_No;
             ChargePower=0;//0 power
-            CCSI_Spnt=0;//No current
+            CCS_ChargeAmpReq=0;//No current
             if(LIM_Stat_Pilot == 6) {LIM_SM=0;} //Reset to state 0 if we get a static pilot
-            // if(LIM_Charger_Type==0x04 || LIM_Charger_Type==0x28|| LIM_Charger_Type==0x09) //
-            if(LIM_Charger_Type==0x09) //DC-Typ1
+            if(LIM_Charger_Type==0x04 || LIM_Charger_Type==0x08 || LIM_Charger_Type==0x09) // //DC-Typ1 or DC-Type2
+            // if(LIM_Charger_Type==0x04) //DC-Typ1
               {	
               if(millis() > millis_ctr_LIM_SM + 2500)//2 secs efacec critical! 20 works. 50 does not.
                 {
@@ -2694,7 +2733,7 @@ void DC_Charge(void)
             //
             DC_Charge_Phase=DCChargePhase_CableTest;
             CCS_Contactor_Ctrl=0x0; //dc contactor mode control required in DC
-            I_Target_DCCharge=0;//ccs current request from web ui for now.
+            I_Target_DCCharge=0;
             ctr_mins_LIMsend_EOC=0x1E;//end of charge timer 30 mins
             ctr_secs_LIMsend_BulkSOC=1800; //Set bulk SOC timer to 30 minutes.
             ctr_secs_LIMsend_FullSOC=2400; //Set full SOC timer to 40 minutes.
@@ -2704,7 +2743,7 @@ void DC_Charge(void)
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_Yes;
             ChargePower=44000/25;//44kw approx power
-            CCSI_Spnt=0;//No current
+            CCS_ChargeAmpReq=0;//No current
             if(LIM_V_CP_DC>0)
               {
                 LIM_SM=3; //we wait for the contactor voltage to rise before hitting next state.
@@ -2716,13 +2755,13 @@ void DC_Charge(void)
           {
             DC_Charge_Phase=DCChargePhase_CableTest;
             CCS_Contactor_Ctrl=0x0; //dc contactor mode control required in DC
-            I_Target_DCCharge=0;//ccs current request from web ui for now.
+            I_Target_DCCharge=0;
             // EOC_Time=0x1E;//end of charge timer
             ChargeStatus=Charge_Initialisation;
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_Yes;
             ChargePower=44000/25;//39kw approx power
-            CCSI_Spnt=0;//No current
+            CCS_ChargeAmpReq=0;//No current
             if(LIM_V_CP_DC<=50) //we wait for the contactor voltage to drop under 50v to indicate end of cable test
               {	
               if(millis() > millis_ctr_LIM_SM + 2000)
@@ -2737,13 +2776,13 @@ void DC_Charge(void)
           {
             DC_Charge_Phase=DCChargePhase_Subpoena; //precharge phase in this state
             CCS_Contactor_Ctrl= 0x0;                   //dc contactor mode control required in DC
-            I_Target_DCCharge = 0;                        //ccs current request from web ui for now.
+            I_Target_DCCharge = 0;                        
             // EOC_Time=0x1E;//end of charge timer
             ChargeStatus=Charge_Initialisation;
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_Yes;
             ChargePower = 44000 / 25; //49kw approx power
-            CCSI_Spnt = 0;        //No current
+            CCS_ChargeAmpReq = 0;        //No current
 
             if ((ISA_BatVolt/10 - LIM_V_CP_DC) < 20)
               {
@@ -2758,13 +2797,13 @@ void DC_Charge(void)
             //precharge phase in this state but voltage close enough to close contactors
             DC_Charge_Phase=DCChargePhase_Subpoena;
             CCS_Contactor_Ctrl = 0x2;                   //dc contactor closed
-            I_Target_DCCharge = 0;                        //ccs current request from web ui for now.
+            I_Target_DCCharge = 0;                        
             // EOC_Time=0x1E;//end of charge timer
             ChargeStatus=Charge_Initialisation;
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_Yes;
             ChargePower = 44000 / 25; //49kw approx power
-            CCSI_Spnt = 0;        //No current
+            CCS_ChargeAmpReq = 0;        //No current
             
             // Once the contactors report as closed we're OK to proceed to energy transfer
             if (((LIM_Stat_DC_Rel>>0)&1)==1) //LIM reports both contactors closed
@@ -2780,7 +2819,7 @@ void DC_Charge(void)
             DC_Charge_Phase=DCChargePhase_EnergyTransfer;
             CCS_Contactor_Ctrl=0x2; //dc contactor to close mode
             //FC_Cur=Param::GetInt(Param::CCS_ICmd);//ccs manual control
-            I_Target_DCCharge=CCSI_Spnt;//Param::GetInt(Param::CCS_ICmd);//ccs auto ramp
+            I_Target_DCCharge=CCS_ChargeAmpReq;
             CCS_Pwr_Con(); //ccs power control subroutine
             Chg_Timers();   //Handle remaining time timers.
             //  EOC_Time=0x1E;//end of charge timer
@@ -2852,24 +2891,24 @@ void DC_Charge(void)
 
 void CCS_Pwr_Con(void)    //here we control ccs charging during state 6.
   {
-      // uint16_t Tmp_Vbatt=ISA_BatVolt;//Actual measured battery voltage by isa shunt
-      // uint16_t Tmp_Vbatt_Spnt=Param::GetInt(Param::Voltspnt);
-      // uint16_t Tmp_ICCS_Lim=Param::GetInt(Param::CCS_ILim); //max desired CCS charging current - use this to do initial test before setting const
-      // uint16_t Tmp_ICCS_Avail=Param::GetInt(Param::CCS_I_Avail);
-
-      // if(CCSI_Spnt>Tmp_ICCS_Lim)CCSI_Spnt=Tmp_ICCS_Lim; //clamp setpoint to current lim paramater.
-      // if(CCSI_Spnt>150)CCSI_Spnt=150; //never exceed 150amps for now.
-      // if(CCSI_Spnt>=Tmp_ICCS_Avail)CCSI_Spnt=Tmp_ICCS_Avail; //never exceed available current
-      // if(CCSI_Spnt>250)CCSI_Spnt=0; //crude way to prevent rollover
-      // if((Tmp_Vbatt<Tmp_Vbatt_Spnt)&&(CCS_Ilim==0x0)&&(CCS_Plim==0x0))CCSI_Spnt++;//increment if voltage lower than setpoint and power and current limts not set from charger.
-      // if(Tmp_Vbatt>Tmp_Vbatt_Spnt)CCSI_Spnt--;//decrement if voltage equal to or greater than setpoint.
-      // if(CCS_Ilim==0x1)CCSI_Spnt--;//decrement if current limit flag is set
-      // if(CCS_Plim==0x1)CCSI_Spnt--;//decrement if Power limit flag is set
+      // Convert BMS charge current to 8bit
+      uint8_t temp_BMS_ChargeAmpLim = (uint8_t) ((BMS_ChargeAmpLim/10) & 0x00FF);
+      CCS_ChargeAmpReq = temp_BMS_ChargeAmpLim;
+      if (CCS_ChargeAmpReq>150)CCS_ChargeAmpReq=150; //never exceed 150amps
+      if (CCS_ChargeAmpReq>LIM_DCSE_I_Avbl)CCS_ChargeAmpReq=LIM_DCSE_I_Avbl; //never exceed EVSE available current
+      if (CCS_ChargeAmpReq>250)CCS_ChargeAmpReq=0; //crude way to prevent rollover
+      //raise amps
+      if ((ISA_BatVolt<BMS_ChargeVoltLim) && (LIM_DCSE_I_LIM_Reached==0x0) && (LIM_DCSE_P_LIM_Reached==0x0))CCS_ChargeAmpReq++;//increment if voltage lower than setpoint and power and current limts not set from charger.
+      if(ISA_BatVolt>BMS_ChargeVoltLim)CCS_ChargeAmpReq--;//decrement if voltage  greater than setpoint.
+      //lower amps
+      if(LIM_DCSE_I_LIM_Reached==0x1)CCS_ChargeAmpReq--;//decrement if current limit flag is set
+      if(LIM_DCSE_P_LIM_Reached==0x1)CCS_ChargeAmpReq--;//decrement if Power limit flag is set
+      //SOC>80%
+      if (BMS_SOC>800 && CCS_ChargeAmpReq>5) {CCS_ChargeAmpReq=5;}
+      //SOC>=100%
+      if (BMS_SOC>=1000){CCS_ChargeAmpReq=0;}
       // //BMS charge current limit for CCS
-      // //Note: No need to worry about bms type as if none selected sets to 999.
-      // CCSI_Spnt = MIN(Param::GetInt(Param::BMS_ChargeLim), CCSI_Spnt);
-
-      // Param::SetInt(Param::CCS_Ireq,CCSI_Spnt);
+      if(CCS_ChargeAmpReq>temp_BMS_ChargeAmpLim) CCS_ChargeAmpReq = temp_BMS_ChargeAmpLim;
   }
 void Chg_Timers(void)
   {
@@ -3005,7 +3044,7 @@ void loop()
       {
         //send start command via CAN
           Drive_Cmd_Start=true;
-          send_Drive_Cmd();
+          // send_Drive_Cmd();
           Drive_Cmd_Start_Watchdog=millis();
           Drive_Cmd_StartPerm=false;
       }
@@ -3015,7 +3054,7 @@ void loop()
       if (swIgnitionDelayOff) 
         {
           Drive_Cmd_Start=false;
-          send_Drive_Cmd();
+          // send_Drive_Cmd();
           Drive_Cmd_StartPerm=true;
         }
     }
@@ -3025,7 +3064,7 @@ void loop()
       if ((millis() > (Drive_Cmd_Start_Watchdog + 5000)) || (Drive_Status != Drive_Stat_Invalid && Drive_OpMode != Drive_OPMODE_Invalid && Drive_OpMode == Drive_OPMODE_Run))
         {
           Drive_Cmd_Start=false;
-          send_Drive_Cmd();
+          // send_Drive_Cmd();
           Drive_Cmd_StartPerm=false;
         }
     }
@@ -3093,29 +3132,39 @@ void loop()
           //   {
           //     pwmBPumpVarTemp=pwmPumpHigh_lowFlow;
           //     //if in temp threshold put updated frequency into temp variable to allow for delayed changes
-              if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000) 
-                {
-                  pwmFanTempVal=100;
-                  pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
-                }
-              else
-                {
-                  if (Drive_MotorTemp>4000 || Drive_HtSnkTemp>10000) 
-                    {
-                      pwmFanTempVal=30;
-                      pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
-                    }
-                  if (Drive_MotorTemp<=3700 && Drive_HtSnkTemp<=9000) 
-                    {
-                      pwmFanTempVal=0;
-                      pwmMPumpVarTemp=pwmPumpHigh_lowFlow;
-                    }
-                }
-              if (BMS_State==BMS_Drive) 
-                {
-                  if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
-                }
+              // if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000) 
+              //   {
+              //     pwmFanTempVal=100;
+              //     pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
+              //   }
+              // else
+              //   {
+              //     if (Drive_MotorTemp>4000 || Drive_HtSnkTemp>10000) 
+              //       {
+              //         pwmFanTempVal=30;
+              //         pwmMPumpVarTemp=pwmPumpHigh_hiFlow;
+              //       }
+              //     if (Drive_MotorTemp<=3700 && Drive_HtSnkTemp<=9000) 
+              //       {
+              //         pwmFanTempVal=0;
+              //         pwmMPumpVarTemp=pwmPumpHigh_lowFlow;
+              //       }
+              //   }
+              // if (BMS_State==BMS_Drive) 
+              //   {
+              //     if (pwmMPumpVar>pwmPumpHigh_midFlow || pwmMPumpVarTemp>pwmPumpHigh_midFlow) {pwmMPumpVarTemp=pwmPumpHigh_midFlow;}
+              //   }
             // }
+            pwmBPumpVarTemp=200;
+            pwmMPumpVarTemp=200;
+            if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000 || (BMS_CellsTempMax-273)>=33) pwmFanTempVal=70;
+            if (Drive_MotorTemp<5000 && Drive_HtSnkTemp<10000 && (BMS_CellsTempMax-273)<30) pwmFanTempVal=50;
+            if (Drive_MotorTemp<3000 && Drive_HtSnkTemp<80000 && (BMS_CellsTempMax-273)<25) 
+              {
+                if (BMS_State==BMS_Charge || BMS_State==BMS_Drive) pwmFanTempVal=30;
+                else pwmFanTempVal=0;
+              }
+
         }
     }
   else  //ignition off?
@@ -3183,12 +3232,12 @@ void loop()
     }
 
   // CHARGING CTRL-------------------------------------------------------------------------------------
-  //stop charge button monitor
+  //"stop charge" button
   if(digitalRead(inStopCharge)) {pbStopChargePressed=false;}
   else  {pbStopChargePressed=true;}
   
   // monitor charging request
-  if (LIM_Stat_Line_Plg==0)  //no cable plugged in
+  if (LIM_Stat_Line_Plg!=1)  //no cable plugged in
     {
       if (Flap_Status==1)
         {
@@ -3198,7 +3247,7 @@ void loop()
           Everything_Off();
         }
     }
-  else if (LIM_Stat_Line_Plg==1){digitalWrite(outBMSChargeReq,HIGH);} //tell BMS to go into charge mode - HIGH on BMS charge enable input}
+  else {digitalWrite(outBMSChargeReq,HIGH);} //tell BMS to go into charge mode - HIGH on BMS charge enable input}
 
   if (BMS_State == BMS_Charge) {OBD=false;}
   else {OBD=true;}
@@ -3220,7 +3269,7 @@ void loop()
     }
   else
     {
-      LIM_SM=0; 
+      LIM_SM=40; 
       ChargeStatus=Charge_NotReady;
       Everything_Off();  
     }
