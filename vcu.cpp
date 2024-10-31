@@ -194,12 +194,11 @@ bool Drive_Cmd_Brake=false;
 bool Drive_Cmd_Fwd=false;
 bool Drive_Cmd_Rev=false;
 bool Drive_Cmd_BMS=false;
-long Drive_Cmd_Pot1=0;
-long Drive_Cmd_Pot2=0;
-long Drive_Cmd_CruiseSpeed=0;
-long Drive_Cmd_RegenPreset=0;
-uint8_t Drive_Cmd_Ctr1=0;
-uint8_t Drive_Cmd_Ctr2=0;
+uint16_t Drive_Cmd_Pot1=0;
+uint16_t Drive_Cmd_Pot2=0;
+uint16_t Drive_Cmd_CruiseSpeed=0;
+uint16_t Drive_Cmd_RegenPreset=0;
+uint8_t Drive_Cmd_Ctr=0;
 uint8_t Drive_Cmd_CRC=0;
 
 // ISA
@@ -311,10 +310,10 @@ uint8_t LIM_DCSE_Bat_Comp;                     // E 2B2h Battery compatible? 0=c
 uint8_t LIM_DCSE_Loc_Stat;                     // E 2B2h Locked? 0=no, 1=yes 3=invalid
 uint8_t LIM_DCSE_Chg_Prob;                     // E 2B2h charging error 0=normal, 1=field. 3=invalid
 uint8_t LIM_DCSE_Chg_Stat;                     // E 2B2h Charging status 0=standby, 1=charging 3=invalid
-uint16_t LIM_DCSE_I_Current;                       // E 2B2h Current current from DC EVSE up to 255A in 0.1A steps
-uint16_t LIM_DCSE_V_Current;                       // E 2B2h Current voltage from DC EVSE to 600V in 0.1V steps
+uint16_t LIM_DCSE_I_Current;                       // E 2B2h Actual current from DC EVSE up to 255A in 0.1A st
+uint16_t LIM_DCSE_V_Current;                       // E 2B2h Actual voltage from DC EVSE to 600V in 0.1V steps
 uint8_t LIM_DCSE_Eng_Trsm;                     // E 2EFh Transferred kWh from the DC EVSE in 0.25kWh steps
-uint8_t LIM_DCSE_Lacation;                     // E 2EFh 0=private, 1=office, 2=public, 3=invalid
+uint8_t LIM_DCSE_Location;                     // E 2EFh 0=private, 1=office, 2=public, 3=invalid
 uint8_t LIM_DCSE_P_LIM_Reached;                   // E 2EFh Power limit reached? 0=no 1=yes 3=invalid
 uint16_t LIM_DCSE_I_Tol;                       // E 2EFh Current tolerance up to 20A in 0.01A steps
 uint16_t LIM_DCSE_I_Riple;                     // E 2EFh Current ripple up to 20A in 0.01A steps
@@ -865,7 +864,7 @@ void Debug(void)
       Serial.print      ("C, Drive Motor Temp| ");
       Serial.println();
       printFormat(Drive_HtSnkTemp,100.0f,2); 
-      Serial.print      ("C, Drive HeatSink Temp| ");
+      Serial.print      ("C, Drive Inverter/HeatSink Temp| ");
       Serial.println();
       // Serial.print(BMS_CellsTempMax);
       // Serial.print      ("K, BMS_CellsTempMax ");
@@ -938,7 +937,7 @@ void Debug(void)
       Serial.print      (" | ");
       printFormat(ISA_BatVolt,10.0f,2);
       Serial.print      ("V ->Bat.Voltage Act.(ISA)| ");
-      printFormat(8192-ISA_BatAmp,10.0f,2);
+      printFormat(8192-ISA_BatAmp,-10.0f,2);
       Serial.print      ("A ->Bat.Current Act. (ISA)  | ");
       printFormat(ISA_MainPOSVolt,10.0f,2);
       Serial.print      ("V ->MPOS.Voltage Act.(ISA)| ");
@@ -995,7 +994,7 @@ void Debug(void)
       Serial.print      ("     ->Charge SM Step         | ");
       Serial.println();
       Serial.print      (" | ");
-      printFormat(BMS_SOC,10.0f,2);
+      printFormat(BMS_SOC,10.0f,1);
       Serial.print      ("% ->SOC from BMS           | "); 
 
       
@@ -1378,10 +1377,10 @@ void Debug_DC(void)
   else Serial.print ("   -.--");
   Serial.print      ("kW->transmitted by EVSE   | ");
     
-  if (LIM_DCSE_Lacation==0)  Serial.print ("Location private                  | ");
-  if (LIM_DCSE_Lacation==1)  Serial.print ("Office location                    | ");
-  if (LIM_DCSE_Lacation==2)  Serial.print ("Location public              | ");
-  if (LIM_DCSE_Lacation==3)  Serial.print ("Location invalid                | ");
+  if (LIM_DCSE_Location==0)  Serial.print ("Location private                  | ");
+  if (LIM_DCSE_Location==1)  Serial.print ("Office location                    | ");
+  if (LIM_DCSE_Location==2)  Serial.print ("Location public              | ");
+  if (LIM_DCSE_Location==3)  Serial.print ("Location invalid                | ");
 
   if (LIM_DCSE_P_LIM_Reached==0)  Serial.print ("Power limit reached? no   | ");
   if (LIM_DCSE_P_LIM_Reached==1)  Serial.print ("Power limit reached? yes     | ");
@@ -1528,7 +1527,7 @@ void Set_ZeroDC(void)
   LIM_DCSE_V_Current=0xFFFF;
 
   LIM_DCSE_Eng_Trsm=0xFF;
-  LIM_DCSE_Lacation=3;
+  LIM_DCSE_Location=3;
   LIM_DCSE_P_LIM_Reached=3;
   LIM_DCSE_I_Tol=0XFFF;
   LIM_DCSE_I_Riple=0XFFF;
@@ -1588,7 +1587,6 @@ void Check_ISA(CAN_message_t incoming)
           readingISAamps=8192-readingISAamps;
           if (readingISAamps > 0) ISA_BatAmp=(uint16_t)readingISAamps;
           else ISA_BatAmp = 0;
-          // ISA_BatAmp=(uint16_t)readingISAamps;
           break;
         }
         case canID_ISAVolt1:
@@ -1771,7 +1769,7 @@ void Check_LIM(CAN_message_t incoming)
         break;
         case 0x2EF:    
           LIM_DCSE_Eng_Trsm = incoming.buf[7];
-          LIM_DCSE_Lacation = ((incoming.buf[6] >> 6) & 3);
+          LIM_DCSE_Location = ((incoming.buf[6] >> 6) & 3);
           LIM_DCSE_P_LIM_Reached = ((incoming.buf[6] >> 4) & 3);
           LIM_DCSE_I_Tol = (uint16_t)((((incoming.buf[6] >> 0) & 15) << 8) | (incoming.buf[5]));
           LIM_DCSE_I_Riple =    (uint16_t)((incoming.buf[4] << 4) | ((incoming.buf[3] >> 4) & 4));
@@ -1910,7 +1908,7 @@ void Check_BMS(CAN_message_t incoming)
             readingBMS_Current = (uint16_t)((incoming.buf[3] << 8) | (incoming.buf[2]));
             // readingBMS_Current=readingBMS_Current/100; //miliamps to amps in 0.1A steps
             // readingBMS_Current=8192-readingBMS_Current;
-            BMS_BatAmp=(long)readingBMS_Current;
+            BMS_BatAmp=(long)(readingBMS_Current*(-1));
             if (readingBMS_Current > 0x7ffffff) BMS_BatAmp=-BMS_BatAmp;
 
             readingBMS_AvgTemp = (int16_t)((incoming.buf[5] << 8) | (incoming.buf[4]));
@@ -1981,21 +1979,28 @@ void send_Drive_Cmd(void)   //send Drive Command
     Drive_Cmd_Pot1=0;
     Drive_Cmd_Pot2=0;
     Drive_Cmd_CruiseSpeed=0;
-    if (BMS_SOC>=900) {Drive_Cmd_RegenPreset=0;} //apply no regen
-    if (BMS_SOC<=850) {Drive_Cmd_RegenPreset=100;} //apply fully defined regen
-    Drive_Cmd_Ctr1+=1;
-    Drive_Cmd_Ctr2+=1;
+    if (BMS_SOC>=900 || (BMS_CellsTempMax-273)>=40 || (BMS_CellsTempMin-273)<10) {Drive_Cmd_RegenPreset=0;} //apply no regen
+    if (BMS_SOC<=850 && (BMS_CellsTempMax-273)<38 && (BMS_CellsTempMin-273)>=12) {Drive_Cmd_RegenPreset=100;} //apply fully defined regen
+    // Drive_Cmd_RegenPreset=100;
+    Drive_Cmd_Ctr+=1;
 
-    uint32_t Pot = Drive_Cmd_Pot1 & 0xFFF;
-    uint32_t Pot2 = Drive_Cmd_Pot2 & 0xFFF;
-    uint32_t canio = ( Drive_Cmd_Cruise | Drive_Cmd_Start<<1|Drive_Cmd_Brake<<2|Drive_Cmd_Fwd<<3|Drive_Cmd_Rev<<4|Drive_Cmd_BMS<<5 ) & 0x3F;
-    uint32_t ctr1 = Drive_Cmd_Ctr1 & 0x3;
-    uint32_t ctr2 = Drive_Cmd_Ctr2 & 0x3;
-    uint32_t cruise_speed = Drive_Cmd_CruiseSpeed & 0x3FFF;
-    uint32_t regen_preset = Drive_Cmd_RegenPreset & 0x7F;
+    uint8_t cruise = ((uint8_t) Drive_Cmd_Cruise)&0x1;
+    uint8_t start = ((uint8_t) Drive_Cmd_Start)&0x1;
+    uint8_t brake = ((uint8_t) Drive_Cmd_Brake)&0x1;
+    uint8_t fwd = ((uint8_t) Drive_Cmd_Fwd)&0x1;
+    uint8_t rev = ((uint8_t) Drive_Cmd_Rev)&0x1;
+    uint8_t bms = ((uint8_t) Drive_Cmd_BMS)&0x1;
+    
+    uint16_t Pot = Drive_Cmd_Pot1 & 0xFFF;
+    uint16_t Pot2 = Drive_Cmd_Pot2 & 0xFFF;
+    // uint8_t canio = ( Drive_Cmd_Cruise | Drive_Cmd_Start<<1|Drive_Cmd_Brake<<2|Drive_Cmd_Fwd<<3|Drive_Cmd_Rev<<4|Drive_Cmd_BMS<<5 ) & 0x3F;
+    uint8_t canio = (cruise | (start<<1) | (brake<<2) | (fwd<<3) | (rev<<4) | (bms<<5)) & 0x3F;
+    uint8_t ctr = Drive_Cmd_Ctr & 0x3;
+    uint16_t cruise_speed = Drive_Cmd_CruiseSpeed & 0x3FFF;
+    uint8_t regen_preset = Drive_Cmd_RegenPreset & 0x7F;
 
-    Drive_Cmd_temp_data[0] = Pot | (Pot2 << 12) | (canio << 24) | (ctr1 << 30);
-    Drive_Cmd_temp_data[1] = cruise_speed | (ctr2 << 14) | (regen_preset << 16);
+    Drive_Cmd_temp_data[0] = Pot | (Pot2 << 12) | (canio << 24) | (ctr << 30);
+    Drive_Cmd_temp_data[1] = cruise_speed | (ctr << 14) | (regen_preset << 16);
     Drive_Cmd_CRC = crc32_word(Drive_Cmd_CRC, Drive_Cmd_temp_data[0]);
     Drive_Cmd_CRC = crc32_word(Drive_Cmd_CRC, Drive_Cmd_temp_data[1]);
 
@@ -2284,16 +2289,19 @@ void send_2F1h(void) //Lim command 2. Used in DC mode
     if(LIM_SM==4 || LIM_SM==5) V_limit=ISA_BatVolt;// drop vlim only during precharge
     else V_limit=415*10;//set to 415v in all other states
     uint8_t I_limit=125;//125A limit. may not work
+    uint16_t temp_ctr_secs_LIMsend_FullSOC=ctr_secs_LIMsend_FullSOC/10;
+    uint16_t temp_ctr_secs_LIMsend_BulkSOC=ctr_secs_LIMsend_BulkSOC/10;
+
     outgoing.id=0x2f1;
     outgoing.flags.extended = false;
     outgoing.len = 8;                
     outgoing.buf[0] = V_limit & 0xFF;  //Charge voltage limit LSB. 14 bit signed int.scale 0.1 0xfa2=4002*.1=400.2Volts
     outgoing.buf[1] = V_limit >> 8;  //Charge voltage limit MSB. 14 bit signed int.scale 0.1
     outgoing.buf[2] = I_limit;  //Fast charge current limit. Not used in logs from 2014-15 vehicle so far. 8 bit unsigned int. scale 1.so max 254amps in theory...
-    outgoing.buf[3] = ctr_secs_LIMsend_FullSOC & 0xFF;  //time remaining in seconds to hit soc target from byte 7 in AC mode. LSB. 16 bit unsigned int. scale 10.Full SOC.
-    outgoing.buf[4] = ctr_secs_LIMsend_FullSOC >> 8;  //time remaining in seconds to hit soc target from byte 7 in AC mode. MSB. 16 bit unsigned int. scale 10.Full SOC.
-    outgoing.buf[5] = ctr_secs_LIMsend_BulkSOC & 0xFF;  //time remaining in seconds to hit soc target from byte 7 in ccs mode. LSB. 16 bit unsigned int. scale 10.Bulk SOC.
-    outgoing.buf[6] = ctr_secs_LIMsend_BulkSOC >> 8;  //time remaining in seconds to hit soc target from byte 7 in ccs mode. MSB. 16 bit unsigned int. scale 10.Bulk SOC.
+    outgoing.buf[3] = temp_ctr_secs_LIMsend_FullSOC & 0xFF;  //time remaining in seconds to hit soc target from byte 7 in AC mode. LSB. 16 bit unsigned int. scale 10.Full SOC.
+    outgoing.buf[4] = temp_ctr_secs_LIMsend_FullSOC >> 8;  //time remaining in seconds to hit soc target from byte 7 in AC mode. MSB. 16 bit unsigned int. scale 10.Full SOC.
+    outgoing.buf[5] = temp_ctr_secs_LIMsend_BulkSOC & 0xFF;  //time remaining in seconds to hit soc target from byte 7 in ccs mode. LSB. 16 bit unsigned int. scale 10.Bulk SOC.
+    outgoing.buf[6] = temp_ctr_secs_LIMsend_BulkSOC >> 8;  //time remaining in seconds to hit soc target from byte 7 in ccs mode. MSB. 16 bit unsigned int. scale 10.Bulk SOC.
     outgoing.buf[7] = 0xA0;  //Fast charge SOC target. 8 bit unsigned int. scale 0.5. 0xA0=160*0.5=80%
     Can1.write(outgoing);
   }
@@ -2588,7 +2596,7 @@ void send_ElconCharger_CtrlReq(void)
 // AC Charging
 void AC_Charge(void)
   {
-    if (LIM_SM<20) LIM_SM=20;
+    if (LIM_SM!=20) LIM_SM=20;
     if (LIM_SM==20) {Timeout=millis(); LIM_SM=21;}
     if (LIM_SM==21) TimeoutExit (2000);
     if (LIM_SM==21 && LIM_Charger_Type==1) //wait for charging mode AC Typ1; 
@@ -2720,9 +2728,10 @@ void DC_Charge(void)
             if(LIM_Charger_Type==0x04 || LIM_Charger_Type==0x08 || LIM_Charger_Type==0x09) // //DC-Typ1 or DC-Type2
             // if(LIM_Charger_Type==0x04) //DC-Typ1
               {	
-              if(millis() > millis_ctr_LIM_SM + 2500)//2 secs efacec critical! 20 works. 50 does not.
+              // if(millis() > millis_ctr_LIM_SM + 2500)//2 secs efacec critical! 20 works. 50 does not.
+              if(millis() > millis_ctr_LIM_SM + 2000) //2 sec efacec critical, abb too?
                 {
-                  LIM_SM=2; //next state after 4 secs
+                  LIM_SM=2;
                   millis_ctr_LIM_SM = millis();
                 }
               }
@@ -2884,6 +2893,7 @@ void DC_Charge(void)
             ChargeReq=ChargeReq_EndCharge;
             ChargeReady=ChargeReady_No;
             ChargePower=0;//0 power
+            LIM_SM=40; //exit state
             break;
           }
       }
@@ -2912,48 +2922,58 @@ void CCS_Pwr_Con(void)    //here we control ccs charging during state 6.
   }
 void Chg_Timers(void)
   {
-    float temp_ctr_mins_LIMsend_EOC=0xFE;
+    float temp_ctr_mins_LIMsend_EOC;//=0xFE;
 
-    if (LIM_SM==25) //AC charging, charging is active
+    // if (LIM_SM==25) //AC charging, charging is active
+    //   {
+    //     //timer left to full charge in minutes
+    //     temp_ctr_mins_LIMsend_EOC=(float) (BMS_SOC/1000.0); //BMS_SOC is in 0.1% scale, hence /1000% not /100%
+    //     temp_ctr_mins_LIMsend_EOC=(float) (1-temp_ctr_mins_LIMsend_EOC);
+    //     temp_ctr_mins_LIMsend_EOC=(float) (BMS_CapacityAh*temp_ctr_mins_LIMsend_EOC);
+    //     temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*60.0); //hrs to mins *60
+    //     temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*10.0/(8192-ISA_BatAmp)); //ISA amps are in 0.1A scale, hence *10
+    //     if (temp_ctr_mins_LIMsend_EOC>0xFE) ctr_mins_LIMsend_EOC=0xFE;
+    //     else ctr_mins_LIMsend_EOC= (uint8_t) temp_ctr_mins_LIMsend_EOC;
+    //   }
+    // else if (LIM_SM==6) //DC charging, charging is active
+    //   {
+    //     // if(millis() > millis_ctr_LIM_SOC + 1000)
+    //     //   {
+    //     //     ctr_secs_LIMsend_BulkSOC--;    //Decrement timers.
+    //     //     ctr_secs_LIMsend_FullSOC--;
+    //     //     Timer_60Sec--;  //decrement the 1 minute counter
+    //     //     if(Timer_60Sec==0)
+    //     //       {
+    //     //           Timer_60Sec=60;
+    //     //           ctr_mins_LIMsend_EOC--;    //decrement end of charge minutes timer
+    //     //       }
+    //     //     millis_ctr_LIM_SOC = millis(); //update SOC hearbeat 
+    //     //   }
+    //     //timer left to charge
+    //     temp_ctr_mins_LIMsend_EOC=(float) (BMS_SOC/1000.0); //BMS_SOC is in 0.1% scale, hence /1000% not /100%
+    //     temp_ctr_mins_LIMsend_EOC=(float) (1-temp_ctr_mins_LIMsend_EOC);
+    //     temp_ctr_mins_LIMsend_EOC=(float) (BMS_CapacityAh*temp_ctr_mins_LIMsend_EOC);
+    //     temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*60.0); //hrs to mins *60
+    //     temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*10.0/(8192-ISA_BatAmp)); //ISA amps are in 0.1A scale, hence *10
+    //     if (temp_ctr_mins_LIMsend_EOC>0xFE) ctr_mins_LIMsend_EOC=0xFE;
+    //     else ctr_mins_LIMsend_EOC= (uint8_t) temp_ctr_mins_LIMsend_EOC;
+    //     if ((temp_ctr_mins_LIMsend_EOC*60)>0xFFFE) ctr_secs_LIMsend_FullSOC=0xFFFE;
+    //     else ctr_secs_LIMsend_FullSOC= (uint16_t) temp_ctr_mins_LIMsend_EOC*60;
+    //     ctr_secs_LIMsend_BulkSOC=(uint16_t) temp_ctr_mins_LIMsend_EOC*48; //80% * 60 = 48
+    //   }
+    if (LIM_SM==6 || LIM_SM==25) //DC or AC charging, energy transfer
       {
-        //timer left to full charge in minutes
+        //timer left to charge
         temp_ctr_mins_LIMsend_EOC=(float) (BMS_SOC/1000.0); //BMS_SOC is in 0.1% scale, hence /1000% not /100%
         temp_ctr_mins_LIMsend_EOC=(float) (1-temp_ctr_mins_LIMsend_EOC);
         temp_ctr_mins_LIMsend_EOC=(float) (BMS_CapacityAh*temp_ctr_mins_LIMsend_EOC);
         temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*60.0); //hrs to mins *60
-        temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*10.0/ElconCharger_AmpOutput); //Elcon charger amps are in 0.1A scale, hence *10
+        temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*10.0/(8192-ISA_BatAmp)); //ISA amps are in 0.1A scale, hence *10
         if (temp_ctr_mins_LIMsend_EOC>0xFE) ctr_mins_LIMsend_EOC=0xFE;
         else ctr_mins_LIMsend_EOC= (uint8_t) temp_ctr_mins_LIMsend_EOC;
-      }
-    else if (LIM_SM==6) //DC charging, charging is active
-      {
-        if(millis() > millis_ctr_LIM_SOC + 1000)
-          {
-            ctr_secs_LIMsend_BulkSOC--;    //Decrement timers.
-            ctr_secs_LIMsend_FullSOC--;
-            Timer_60Sec--;  //decrement the 1 minute counter
-            if(Timer_60Sec==0)
-              {
-                  Timer_60Sec=60;
-                  ctr_mins_LIMsend_EOC--;    //decrement end of charge minutes timer
-              }
-            millis_ctr_LIM_SOC = millis(); //update SOC hearbeat 
-          }
-        //timer left to full charge in minutes
-        // temp_ctr_mins_LIMsend_EOC=(float) (BMS_SOC/1000.0); //BMS_SOC is in 0.1% scale, hence /1000% not /100%
-        // temp_ctr_mins_LIMsend_EOC=(float) (1-temp_ctr_mins_LIMsend_EOC);
-        // temp_ctr_mins_LIMsend_EOC=(float) (BMS_CapacityAh*temp_ctr_mins_LIMsend_EOC);
-        // temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*60.0); //hrs to mins *60
-        // temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*10.0/ElconCharger_AmpOutput); //Elcon charger amps are in 0.1A scale, hence *10
-        // if (temp_ctr_mins_LIMsend_EOC>0xFE) ctr_mins_LIMsend_EOC=0xFE;
-        // else ctr_mins_LIMsend_EOC= (uint8_t) temp_ctr_mins_LIMsend_EOC;
-        // //timer left to full charger in seconds
-        // ctr_secs_LIMsend_FullSOC=(uint16_t) ctr_mins_LIMsend_EOC*60;
-        // //timer left to 80% charge in seconds
-        // temp_ctr_mins_LIMsend_EOC=(float) (0.8*BMS_CapacityAh*(1-BMS_SOC/10.0)); //0.8 is 80% of full capacity; BMS_SOC is in 0.1% scale, hence /10% not /100%
-        // temp_ctr_mins_LIMsend_EOC=(float) temp_ctr_mins_LIMsend_EOC*3600.0; //hrs to sec *360
-        // temp_ctr_mins_LIMsend_EOC=(float) temp_ctr_mins_LIMsend_EOC*10.0/LIM_DCSE_I_Current; //EVSE DC amps are in 0.1A scale, hence *10
-        // ctr_secs_LIMsend_BulkSOC=(uint16_t) temp_ctr_mins_LIMsend_EOC;
+        if ((temp_ctr_mins_LIMsend_EOC*60)>0xFFFE) ctr_secs_LIMsend_FullSOC=0xFFFE;
+        else ctr_secs_LIMsend_FullSOC= (uint16_t) temp_ctr_mins_LIMsend_EOC*60;
+        ctr_secs_LIMsend_BulkSOC=(uint16_t) temp_ctr_mins_LIMsend_EOC*48; //80% * 60 = 48
       }
   }
   
@@ -3157,13 +3177,15 @@ void loop()
             // }
             pwmBPumpVarTemp=200;
             pwmMPumpVarTemp=200;
-            if (Drive_MotorTemp>=6000 || Drive_HtSnkTemp>=12000 || (BMS_CellsTempMax-273)>=33) pwmFanTempVal=70;
-            if (Drive_MotorTemp<5000 && Drive_HtSnkTemp<10000 && (BMS_CellsTempMax-273)<30) pwmFanTempVal=50;
-            if (Drive_MotorTemp<3000 && Drive_HtSnkTemp<80000 && (BMS_CellsTempMax-273)<25) 
-              {
-                if (BMS_State==BMS_Charge || BMS_State==BMS_Drive) pwmFanTempVal=30;
-                else pwmFanTempVal=0;
-              }
+            // if (Drive_HtSnkTemp>=6000 || Drive_MotorTemp>=12000 || (BMS_CellsTempMax-273)>=33) pwmFanTempVal=70;
+            // if (Drive_HtSnkTemp<5500 && Drive_MotorTemp<10000 && (BMS_CellsTempMax-273)<30) pwmFanTempVal=50;
+            // if (Drive_HtSnkTemp<4000 && Drive_MotorTemp<80000 && (BMS_CellsTempMax-273)<25) 
+            //   {
+            //     if (BMS_State==BMS_Charge || BMS_State==BMS_Drive) pwmFanTempVal=30;
+            //     else pwmFanTempVal=0;
+            //   }
+            if (BMS_State==BMS_Charge || BMS_State==BMS_Drive) pwmFanTempVal=30;
+            else pwmFanTempVal=0;
 
         }
     }
@@ -3249,12 +3271,15 @@ void loop()
     }
   else {digitalWrite(outBMSChargeReq,HIGH);} //tell BMS to go into charge mode - HIGH on BMS charge enable input}
 
-  if (BMS_State == BMS_Charge) {OBD=false;}
-  else {OBD=true;}
+  // if (BMS_State == BMS_Charge) {OBD=false;}
+  // else {OBD=true;}
 
-  // DC isolation test
-  // if (((LIM_Stat_DC_Rel>>2)&7)!=0 && LIM_Stat_Pos_Flap==1) {DC_test_on();}
-  // if (((LIM_Stat_DC_Rel>>2)&7)==0) {DC_test_off();}
+  // DC isolation test, LIM contactors check on car start and whenever BMS = Ready (Idle state) - is test=fail, run LIM contactors check
+  if (swIgnitionDelayOn && Drive_OpMode == Drive_OPMODE_Run && BMS_State == BMS_Ready)
+    {
+      if (((LIM_Stat_DC_Rel>>2)&7)!=0 && LIM_Stat_Pos_Flap==1) {DC_test_on();}
+      if (((LIM_Stat_DC_Rel>>2)&7)==0) {DC_test_off();}
+    }
   //Charging
   if ((BMS_CellsTempMin-273)>=5 && (BMS_CellsTempMax-273)<=40) //charge under certain battery temp conditions
     {
