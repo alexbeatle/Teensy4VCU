@@ -1979,9 +1979,9 @@ void send_Drive_Cmd(void)   //send Drive Command
     Drive_Cmd_Pot1=0;
     Drive_Cmd_Pot2=0;
     Drive_Cmd_CruiseSpeed=0;
-    if (BMS_SOC>=900 || (BMS_CellsTempMax-273)>=40 || (BMS_CellsTempMin-273)<10) {Drive_Cmd_RegenPreset=0;} //apply no regen
-    if (BMS_SOC<=850 && (BMS_CellsTempMax-273)<38 && (BMS_CellsTempMin-273)>=12) {Drive_Cmd_RegenPreset=100;} //apply fully defined regen
-    // Drive_Cmd_RegenPreset=100;
+    // if (BMS_SOC<=850 && (BMS_CellsTempMax-273)<38 && (BMS_CellsTempMin-273)>=12) {Drive_Cmd_RegenPreset=100;} //apply fully defined regen
+    // else {Drive_Cmd_RegenPreset=0;}
+    Drive_Cmd_RegenPreset=100;
     Drive_Cmd_Ctr+=1;
 
     uint8_t cruise = ((uint8_t) Drive_Cmd_Cruise)&0x1;
@@ -2669,6 +2669,9 @@ void Everything_Off(void)
     ChargeEnd=ChargeEnd_Yes;
     DCChargeEnd=DCChargeEnd_Yes;
     ElconCharger_AmpReq=0;
+    //reset the obtained EVSE limits
+    LIM_DCSE_I_Current=0xFFFF;
+    LIM_DCSE_V_Current=0xFFFF;
   }
 
 // DC Charging
@@ -2704,8 +2707,7 @@ void DC_Charge(void)
             ChargeReady=ChargeReady_No;
             ChargePower=0;//0 power
             CCS_ChargeAmpReq=0;//No current
-            //if(CP_Mode==0x4 && opmode==MOD_CHARGE) LIM_SM++;
-            if (millis() > millis_ctr_LIM_SM + 2000)
+            if (millis() > (millis_ctr_LIM_SM + 2000))
               {
                 LIM_SM=1; //next state after 2 secs
                 millis_ctr_LIM_SM = millis();
@@ -2724,16 +2726,17 @@ void DC_Charge(void)
             ChargeReady=ChargeReady_No;
             ChargePower=0;//0 power
             CCS_ChargeAmpReq=0;//No current
-            if(LIM_Stat_Pilot == 6) {LIM_SM=0;} //Reset to state 0 if we get a static pilot
+            if(LIM_Stat_Pilot == 6 || millis() > (millis_ctr_LIM_SM + 60000)) {LIM_SM=0;} //Reset to state 0 if we get a static pilot or this step is >60s
             if(LIM_Charger_Type==0x04 || LIM_Charger_Type==0x08 || LIM_Charger_Type==0x09) // //DC-Typ1 or DC-Type2
-            // if(LIM_Charger_Type==0x04) //DC-Typ1
               {	
-              // if(millis() > millis_ctr_LIM_SM + 2500)//2 secs efacec critical! 20 works. 50 does not.
-              if(millis() > millis_ctr_LIM_SM + 2000) //2 sec efacec critical, abb too?
-                {
-                  LIM_SM=2;
-                  millis_ctr_LIM_SM = millis();
-                }
+                // if (LIM_DCSE_I_Current<0xFFFF && LIM_DCSE_V_Current<0xFFFF)
+                  // {
+                    if(millis() > (millis_ctr_LIM_SM + 2500))//2 secs efacec critical! 20 works. 50 does not.
+                      {
+                        LIM_SM=2;
+                        millis_ctr_LIM_SM = millis();
+                      }
+                  // }
               }
             break;
           }
@@ -2773,7 +2776,7 @@ void DC_Charge(void)
             CCS_ChargeAmpReq=0;//No current
             if(LIM_V_CP_DC<=50) //we wait for the contactor voltage to drop under 50v to indicate end of cable test
               {	
-              if(millis() > millis_ctr_LIM_SM + 2000)
+              if(millis() > (millis_ctr_LIM_SM + 2000))
                 {
                   if(LIM_DCSE_Stat_Iso==0x1) LIM_SM=4; //next state after 2 secs if we have valid iso test
                   millis_ctr_LIM_SM = millis();
@@ -2795,7 +2798,7 @@ void DC_Charge(void)
 
             if ((ISA_BatVolt/10 - LIM_V_CP_DC) < 20)
               {
-                if(millis() > millis_ctr_LIM_SM + 2000){LIM_SM=5;} //we wait for the contactor voltage to be 20v or less diff to main batt v. must last for 2+ seconds
+                if(millis() > (millis_ctr_LIM_SM + 2000)){LIM_SM=5;} //we wait for the contactor voltage to be 20v or less diff to main batt v. must last for 2+ seconds
               }
             else {millis_ctr_LIM_SM = millis();}// If the contactor voltage wanders out of range start again
 
@@ -2856,7 +2859,7 @@ void DC_Charge(void)
             ChargeReq=ChargeReq_Charge;
             ChargeReady=ChargeReady_Yes;
             ChargePower=44000/25;//49kw approx power
-            if(millis() > millis_ctr_LIM_SM + 1000) //wait 1 seconds
+            if(millis() > (millis_ctr_LIM_SM + 1000)) //wait 1 seconds
               {
                 LIM_SM=8; //next state after 2 secs
                 millis_ctr_LIM_SM = millis();
@@ -2875,7 +2878,7 @@ void DC_Charge(void)
             ChargePower=44000/25;//49kw approx power
             if(LIM_V_CP_DC==0) //we wait for the contactor voltage to return to 0 to indicate contactors open
               {
-              if(millis() > millis_ctr_LIM_SM + 1000)
+              if(millis() > (millis_ctr_LIM_SM + 1000))
                 {
                   LIM_SM=9; //next state after 1 secs
                   millis_ctr_LIM_SM = millis();
