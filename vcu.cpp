@@ -1023,7 +1023,12 @@ void Debug(void)
       else                       Serial.print ("Ready to charge: no                | ");  
 
       printFormat(ctr_mins_LIMsend_EOC,1.0f,0);
-      Serial.print      (" min ->charge remaining time              | ");                        
+      Serial.print      (" min ->charge remaining time              | ");   
+      printFormat(ctr_secs_LIMsend_FullSOC,10.0f,0);
+      Serial.print      (" sec ->charge remaining time to FULL              | "); 
+      printFormat(ctr_secs_LIMsend_BulkSOC,10.0f,0);
+      Serial.print      (" sec ->charge remaining time to BULK(80%)              | ");           
+                 
 
       Serial.println();
       Serial.print      (" -----------------------------------------------------------------Values received from the LIM----------------------------------------------------");
@@ -2615,7 +2620,7 @@ void AC_Charge(void)
     if (LIM_SM==22) TimeoutExit (2000);
     if (LIM_SM==22)
     {
-      if (BMS_ChargeAmpLim>=ElconCharger_CurrentReqMin && BMS_ChargeAmpLim<=ElconCharger_CurrentReqMax && LIM_ACSE_I_Avbl_Grid>0 && LIM_ACSE_I_Avbl_Grid<253)//ensure BMS charge current and EVSE charge current are within limits
+      if (BMS_ChargeAmpLim>=ElconCharger_CurrentReqMin && BMS_ChargeAmpLim>=ElconCharger_CurrentReqMax && LIM_ACSE_I_Avbl_Grid>0 && LIM_ACSE_I_Avbl_Grid<253)//ensure BMS charge current and EVSE charge current are within limits
         {
           Timeout=millis();
           LIM_SM=23;
@@ -2907,7 +2912,7 @@ void CCS_Pwr_Con(void)    //here we control ccs charging during state 6.
       // Convert BMS charge current to 8bit
       uint8_t temp_BMS_ChargeAmpLim = (uint8_t) ((BMS_ChargeAmpLim/10) & 0x00FF);
       CCS_ChargeAmpReq = temp_BMS_ChargeAmpLim;
-      if (CCS_ChargeAmpReq>150)CCS_ChargeAmpReq=150; //never exceed 150amps
+      if (CCS_ChargeAmpReq>125)CCS_ChargeAmpReq=125; //never exceed 125amps
       if (CCS_ChargeAmpReq>LIM_DCSE_I_Avbl)CCS_ChargeAmpReq=LIM_DCSE_I_Avbl; //never exceed EVSE available current
       if (CCS_ChargeAmpReq>250)CCS_ChargeAmpReq=0; //crude way to prevent rollover
       //raise amps
@@ -2922,10 +2927,16 @@ void CCS_Pwr_Con(void)    //here we control ccs charging during state 6.
       if (BMS_SOC>=1000){CCS_ChargeAmpReq=0;}
       // //BMS charge current limit for CCS
       if(CCS_ChargeAmpReq>temp_BMS_ChargeAmpLim) CCS_ChargeAmpReq = temp_BMS_ChargeAmpLim;
+      // if(BMS_SOC>770 && CCS_ChargeAmpReq>ElconCharger_CurrentReqMax && CCS_ChargeAmpReq>LIM_DCSE_I_Min_Avbl) 
+      //   {
+      //     if (LIM_DCSE_I_Min_Avbl>ElconCharger_CurrentReqMax) CCS_ChargeAmpReq=LIM_DCSE_I_Min_Avbl;
+      //     else CCS_ChargeAmpReq=ElconCharger_CurrentReqMax;
+      //   }
   }
 void Chg_Timers(void)
   {
     float temp_ctr_mins_LIMsend_EOC;//=0xFE;
+    float temp_ISA_BatAmp=ISA_BatAmp-8192;
 
     // if (LIM_SM==25) //AC charging, charging is active
     //   {
@@ -2971,7 +2982,8 @@ void Chg_Timers(void)
         temp_ctr_mins_LIMsend_EOC=(float) (1-temp_ctr_mins_LIMsend_EOC);
         temp_ctr_mins_LIMsend_EOC=(float) (BMS_CapacityAh*temp_ctr_mins_LIMsend_EOC);
         temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*60.0); //hrs to mins *60
-        temp_ctr_mins_LIMsend_EOC=(float) (temp_ctr_mins_LIMsend_EOC*10.0/(8192-ISA_BatAmp)); //ISA amps are in 0.1A scale, hence *10
+        temp_ctr_mins_LIMsend_EOC=(float) temp_ctr_mins_LIMsend_EOC*10.0; //ISA amps are in 0.1A scale, hence *10
+        temp_ctr_mins_LIMsend_EOC=(float) temp_ctr_mins_LIMsend_EOC/temp_ISA_BatAmp;
         if (temp_ctr_mins_LIMsend_EOC>0xFE) ctr_mins_LIMsend_EOC=0xFE;
         else ctr_mins_LIMsend_EOC= (uint8_t) temp_ctr_mins_LIMsend_EOC;
         if ((temp_ctr_mins_LIMsend_EOC*60)>0xFFFE) ctr_secs_LIMsend_FullSOC=0xFFFE;
