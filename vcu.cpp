@@ -2620,7 +2620,7 @@ void AC_Charge(void)
     if (LIM_SM==22) TimeoutExit (2000);
     if (LIM_SM==22)
     {
-      if (BMS_ChargeAmpLim>=ElconCharger_CurrentReqMin && BMS_ChargeAmpLim>=ElconCharger_CurrentReqMax && LIM_ACSE_I_Avbl_Grid>0 && LIM_ACSE_I_Avbl_Grid<253)//ensure BMS charge current and EVSE charge current are within limits
+      if (BMS_ChargeAmpLim>=ElconCharger_CurrentReqMin && LIM_ACSE_I_Avbl_Grid>0 && LIM_ACSE_I_Avbl_Grid<253)//ensure BMS charge current and EVSE charge current are within limits
         {
           Timeout=millis();
           LIM_SM=23;
